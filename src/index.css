@@ -137,6 +137,65 @@ input, select {
   border-color: var(--accent-primary) !important;
 }
 
+/* Cash Preset Buttons & Selected States */
+.cash-preset-btn {
+  background-color: var(--bg-card);
+  border: 1.5px solid var(--border-color) !important;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  user-select: none;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.cash-preset-btn:focus,
+.cash-preset-btn:focus-visible,
+.cash-preset-btn:active {
+  border-color: var(--border-color) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.cash-preset-selected {
+  border-color: var(--accent-primary) !important;
+  background-color: rgba(59, 130, 246, 0.18) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+
+.cash-preset-selected:focus,
+.cash-preset-selected:focus-visible,
+.cash-preset-selected:active {
+  border-color: var(--accent-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Cash Modal Change Card States */
+.cash-change-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1rem;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-color) !important;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.cash-change-card-success {
+  border-color: var(--accent-success) !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2) !important;
+}
+
+.cash-change-card-warning {
+  border-color: var(--accent-warning) !important;
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2) !important;
+}
+
 /* Scrollbar styles */
 ::-webkit-scrollbar {
   width: 5px;

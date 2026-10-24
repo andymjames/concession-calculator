@@ -4,11 +4,12 @@
 
 export const formatCurrency = (amount) => {
   const numeric = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  const hasCents = numeric % 1 !== 0;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(numeric);
 };
 
@@ -68,4 +69,39 @@ export const getQuickCashSuggestions = (total) => {
   higherPresets.forEach((p) => suggestions.add(p));
 
   return Array.from(suggestions).slice(0, 4);
+};
+
+export const getQuickBillSuggestions = (total) => {
+  if (total <= 0) return [5, 10, 20];
+
+  const suggestions = new Set();
+
+  // Next whole dollar if total has cents
+  const nextDollar = Math.ceil(total);
+  if (nextDollar > total) {
+    suggestions.add(nextDollar);
+  }
+
+  // Next $5 increment
+  const nextFive = Math.ceil(total / 5) * 5;
+  if (nextFive > total) {
+    suggestions.add(nextFive);
+  }
+
+  // Next $10 increment
+  const nextTen = Math.ceil(total / 10) * 10;
+  if (nextTen > total) {
+    suggestions.add(nextTen);
+  }
+
+  // Standard US bill denominations strictly higher than total
+  const bills = [5, 10, 20, 50, 100];
+  bills.forEach((b) => {
+    if (b > total) {
+      suggestions.add(b);
+    }
+  });
+
+  const sorted = Array.from(suggestions).sort((a, b) => a - b);
+  return sorted.slice(0, 3);
 };

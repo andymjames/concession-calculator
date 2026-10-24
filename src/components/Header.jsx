@@ -1,13 +1,18 @@
 import { History, Settings } from 'lucide-react';
 
-export default function Header({ openHistory, openSettings, historyCount }) {
+export default function Header({ openHistory, openSettings, historyCount, clearanceMode }) {
   return (
     <header style={styles.header}>
       <div style={styles.brandContainer}>
         <div style={styles.logoBadge}>🍿</div>
         <div>
-          <h1 style={styles.title}>Concession Stand</h1>
-          <span style={styles.subtext}>Volunteer POS</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <h1 style={styles.title}>Concession Stand</h1>
+            {clearanceMode && (
+              <span style={styles.clearanceBadge}>CLEARANCE</span>
+            )}
+          </div>
+          <span style={styles.subtext}>Volunteer POS • v1.1</span>
         </div>
       </div>
 
@@ -65,6 +70,16 @@ const styles = {
     fontWeight: '800',
     color: 'var(--text-primary)',
     lineHeight: '1.15',
+  },
+  clearanceBadge: {
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    color: '#ffffff',
+    backgroundColor: 'var(--accent-warning)',
+    padding: '0.15rem 0.4rem',
+    borderRadius: 'var(--radius-sm)',
+    letterSpacing: '0.04em',
+    lineHeight: 1,
   },
   subtext: {
     fontSize: '0.65rem',

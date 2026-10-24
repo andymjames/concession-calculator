@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { formatCurrency } from '../utils/currency';
 
-export default function ItemGrid({ items, cart, onAddToCart }) {
+export default function ItemGrid({ items, cart, onAddToCart, clearanceMode }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -32,6 +32,14 @@ export default function ItemGrid({ items, cart, onAddToCart }) {
         {filteredItems.map((item) => {
           const qtyInCart = cartQtyMap[item.id] || 0;
           const isSelected = qtyInCart > 0;
+          const isClearance =
+            clearanceMode &&
+            item.clearancePrice !== undefined &&
+            item.clearancePrice < item.price;
+          const activePrice =
+            clearanceMode && item.clearancePrice !== undefined
+              ? item.clearancePrice
+              : item.price;
 
           return (
             <button
@@ -40,10 +48,26 @@ export default function ItemGrid({ items, cart, onAddToCart }) {
               onClick={(e) => handleClick(e, item)}
             >
               {isSelected && <div style={styles.cartBadge}>{qtyInCart}</div>}
+              {isClearance && <div style={styles.clearanceTag}>SALE</div>}
 
               <div style={styles.emojiRow}>{item.emoji || '🍿'}</div>
               <div style={styles.itemName}>{item.name}</div>
-              <div style={styles.itemPrice}>{formatCurrency(item.price)}</div>
+              <div style={styles.priceContainer}>
+                {isClearance && (
+                  <span style={styles.struckPrice}>
+                    {formatCurrency(item.price)}
+                  </span>
+                )}
+                <span
+                  style={
+                    isClearance
+                      ? styles.clearanceItemPrice
+                      : styles.itemPrice
+                  }
+                >
+                  {formatCurrency(activePrice)}
+                </span>
+              </div>
             </button>
           );
         })}
@@ -89,6 +113,20 @@ const styles = {
     border: '2px solid var(--bg-secondary)',
     boxShadow: 'var(--shadow-sm)',
   },
+  clearanceTag: {
+    position: 'absolute',
+    top: '4px',
+    left: '4px',
+    backgroundColor: 'var(--accent-warning)',
+    color: '#ffffff',
+    fontSize: '0.6rem',
+    fontWeight: '800',
+    padding: '1px 5px',
+    borderRadius: 'var(--radius-sm)',
+    letterSpacing: '0.04em',
+    lineHeight: 1.2,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+  },
   emojiRow: {
     fontSize: '1.85rem',
     marginBottom: '0.25rem',
@@ -105,9 +143,26 @@ const styles = {
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
   },
+  priceContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.35rem',
+  },
+  struckPrice: {
+    fontSize: '0.72rem',
+    fontWeight: '700',
+    color: 'var(--text-muted)',
+    textDecoration: 'line-through',
+  },
   itemPrice: {
     fontSize: '0.85rem',
     fontWeight: '800',
     color: 'var(--accent-success)',
+  },
+  clearanceItemPrice: {
+    fontSize: '0.85rem',
+    fontWeight: '800',
+    color: 'var(--accent-warning)',
   },
 };

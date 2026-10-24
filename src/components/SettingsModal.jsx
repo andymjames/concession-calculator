@@ -1,4 +1,4 @@
-import { Edit2, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import { Edit2, Plus, RotateCcw, Save, Trash2, X, Tag } from 'lucide-react';
 import { useState } from 'react';
 import { CATEGORIES } from '../data/defaultItems';
 import { formatCurrency } from '../utils/currency';
@@ -9,13 +9,17 @@ export default function SettingsModal({
   items,
   onUpdateItems,
   onResetDefaultItems,
+  clearanceMode,
+  onToggleClearanceMode,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [editPrice, setEditPrice] = useState('');
+  const [editClearancePrice, setEditClearancePrice] = useState('');
 
   // Form state for adding new item
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newClearancePrice, setNewClearancePrice] = useState('');
   const [newCategory, setNewCategory] = useState('Food');
   const [newEmoji, setNewEmoji] = useState('🍿');
 
@@ -24,14 +28,29 @@ export default function SettingsModal({
   const handleStartEdit = (item) => {
     setEditingId(item.id);
     setEditPrice(item.price.toString());
+    setEditClearancePrice(
+      (item.clearancePrice !== undefined ? item.clearancePrice : item.price).toString(),
+    );
   };
 
   const handleSavePrice = (id) => {
-    const parsed = parseFloat(editPrice);
-    if (isNaN(parsed) || parsed < 0) return;
+    const parsedPrice = parseFloat(editPrice);
+    const parsedClearance = parseFloat(editClearancePrice);
+    if (isNaN(parsedPrice) || parsedPrice < 0) return;
+
+    const finalClearance =
+      isNaN(parsedClearance) || parsedClearance < 0
+        ? parsedPrice
+        : Math.round(parsedClearance * 100) / 100;
 
     const updated = items.map((it) =>
-      it.id === id ? { ...it, price: Math.round(parsed * 100) / 100 } : it,
+      it.id === id
+        ? {
+            ...it,
+            price: Math.round(parsedPrice * 100) / 100,
+            clearancePrice: finalClearance,
+          }
+        : it,
     );
     onUpdateItems(updated);
     setEditingId(null);
@@ -47,12 +66,19 @@ export default function SettingsModal({
   const handleAddNewItem = (e) => {
     e.preventDefault();
     const priceNum = parseFloat(newPrice);
+    const clearanceNum = parseFloat(newClearancePrice);
     if (!newName.trim() || isNaN(priceNum) || priceNum <= 0) return;
+
+    const finalClearance =
+      isNaN(clearanceNum) || clearanceNum < 0
+        ? Math.round(priceNum * 100) / 100
+        : Math.round(clearanceNum * 100) / 100;
 
     const newItem = {
       id: `item-custom-${Date.now()}`,
       name: newName.trim(),
       price: Math.round(priceNum * 100) / 100,
+      clearancePrice: finalClearance,
       category: newCategory,
       emoji: newEmoji || '📌',
     };
@@ -60,6 +86,7 @@ export default function SettingsModal({
     onUpdateItems([...items, newItem]);
     setNewName('');
     setNewPrice('');
+    setNewClearancePrice('');
   };
 
   return (
@@ -73,6 +100,85 @@ export default function SettingsModal({
         </div>
 
         <div style={styles.modalBody}>
+          {/* Section: Clearance Mode Switch */}
+          <div
+            style={{
+              ...styles.sectionCard,
+              borderColor: clearanceMode
+                ? 'var(--accent-warning)'
+                : 'var(--border-color)',
+              backgroundColor: clearanceMode
+                ? 'rgba(245, 158, 11, 0.08)'
+                : 'var(--bg-primary)',
+            }}
+          >
+            <div style={styles.clearanceRow}>
+              <div style={{ flex: 1, paddingRight: '0.75rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    marginBottom: '0.2rem',
+                  }}
+                >
+                  <Tag
+                    size={18}
+                    color={
+                      clearanceMode
+                        ? 'var(--accent-warning)'
+                        : 'var(--text-secondary)'
+                    }
+                  />
+                  <h3 style={styles.sectionTitle}>Clearance Mode</h3>
+                  <span
+                    style={{
+                      ...styles.statusBadge,
+                      backgroundColor: clearanceMode
+                        ? 'var(--accent-warning)'
+                        : 'var(--bg-card-hover)',
+                      color: clearanceMode ? '#ffffff' : 'var(--text-muted)',
+                    }}
+                  >
+                    {clearanceMode ? 'ACTIVE' : 'OFF'}
+                  </span>
+                </div>
+                <p style={styles.clearanceSubtext}>
+                  Sell surplus inventory (Hot Dogs, Burgers, Cheeseburgers) at
+                  reduced end-of-game clearance prices.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="touch-btn"
+                style={{
+                  ...styles.toggleSwitch,
+                  backgroundColor: clearanceMode
+                    ? 'var(--accent-warning)'
+                    : 'var(--bg-card-hover)',
+                  border: `1.5px solid ${
+                    clearanceMode
+                      ? 'var(--accent-warning)'
+                      : 'var(--border-color)'
+                  }`,
+                }}
+                onClick={onToggleClearanceMode}
+                title="Toggle Clearance Mode"
+                aria-pressed={clearanceMode}
+              >
+                <div
+                  style={{
+                    ...styles.toggleThumb,
+                    transform: clearanceMode
+                      ? 'translateX(24px)'
+                      : 'translateX(0)',
+                  }}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Section: Add New Custom Menu Item */}
           <div style={styles.sectionCard}>
             <h3 style={styles.sectionTitle}>Add New Item to Menu</h3>
@@ -103,11 +209,19 @@ export default function SettingsModal({
                 <input
                   type="number"
                   step="0.25"
-                  placeholder="Price (e.g. 3.50)"
+                  placeholder="Reg ($)"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                   style={{ ...styles.input, flex: 1 }}
                   required
+                />
+                <input
+                  type="number"
+                  step="0.25"
+                  placeholder="Clearance ($)"
+                  value={newClearancePrice}
+                  onChange={(e) => setNewClearancePrice(e.target.value)}
+                  style={{ ...styles.input, flex: 1 }}
                 />
                 <select
                   value={newCategory}
@@ -163,40 +277,76 @@ export default function SettingsModal({
 
                   <div style={styles.itemRight}>
                     {editingId === item.id ? (
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(e.target.value)}
-                          style={{
-                            ...styles.input,
-                            width: '80px',
-                            padding: '0.2rem 0.4rem',
-                          }}
-                          autoFocus
-                        />
+                      <div style={styles.editInputsGroup}>
+                        <div style={styles.editField}>
+                          <span style={styles.miniLabel}>Reg</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(e.target.value)}
+                            style={styles.editInput}
+                            autoFocus
+                          />
+                        </div>
+                        <div style={styles.editField}>
+                          <span style={styles.miniLabel}>Clr</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={editClearancePrice}
+                            onChange={(e) =>
+                              setEditClearancePrice(e.target.value)
+                            }
+                            style={styles.editInput}
+                          />
+                        </div>
                         <button
+                          type="button"
                           style={styles.saveBtn}
                           onClick={() => handleSavePrice(item.id)}
+                          title="Save Prices"
                         >
                           <Save size={14} />
                         </button>
                       </div>
                     ) : (
-                      <span
-                        style={styles.priceDisplay}
-                        onClick={() => handleStartEdit(item)}
-                        title="Click to edit price"
-                      >
-                        {formatCurrency(item.price)}
-                      </span>
+                      <div style={styles.priceColumn}>
+                        <div style={styles.priceBadgeRow}>
+                          <span style={styles.priceLabel}>Reg</span>
+                          <span
+                            style={styles.priceDisplay}
+                            onClick={() => handleStartEdit(item)}
+                            title="Click to edit regular price"
+                          >
+                            {formatCurrency(item.price)}
+                          </span>
+                        </div>
+                        <div style={styles.priceBadgeRow}>
+                          <span style={styles.priceLabel}>Clr</span>
+                          <span
+                            style={{
+                              ...styles.clearanceDisplay,
+                              color:
+                                (item.clearancePrice ?? item.price) < item.price
+                                  ? 'var(--accent-warning)'
+                                  : 'var(--text-secondary)',
+                            }}
+                            onClick={() => handleStartEdit(item)}
+                            title="Click to edit clearance price"
+                          >
+                            {formatCurrency(
+                              item.clearancePrice ?? item.price,
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     )}
 
                     <button
                       style={styles.actionIconBtn}
                       onClick={() => handleStartEdit(item)}
-                      title="Edit Price"
+                      title="Edit Prices"
                     >
                       <Edit2 size={15} />
                     </button>
@@ -277,7 +427,45 @@ const styles = {
     backgroundColor: 'var(--bg-primary)',
     borderRadius: 'var(--radius-lg)',
     padding: '1rem',
-    border: '1px solid var(--border-color)',
+    border: '1.5px solid var(--border-color)',
+    transition: 'all 0.15s ease',
+  },
+  clearanceRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearanceSubtext: {
+    fontSize: '0.75rem',
+    color: 'var(--text-secondary)',
+    lineHeight: 1.35,
+  },
+  statusBadge: {
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    padding: '0.1rem 0.4rem',
+    borderRadius: 'var(--radius-sm)',
+    letterSpacing: '0.04em',
+  },
+  toggleSwitch: {
+    width: '52px',
+    height: '28px',
+    borderRadius: '999px',
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '2px',
+    cursor: 'pointer',
+    flexShrink: 0,
+    transition: 'background-color 0.2s ease, border-color 0.2s ease',
+  },
+  toggleThumb: {
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+    transition: 'transform 0.2s ease',
   },
   sectionHeaderRow: {
     display: 'flex',
@@ -364,20 +552,82 @@ const styles = {
     alignItems: 'center',
     gap: '0.6rem',
   },
+  priceColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.2rem',
+  },
+  priceBadgeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+  },
+  priceLabel: {
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase',
+    width: '24px',
+  },
   priceDisplay: {
     fontWeight: '800',
-    fontSize: '0.95rem',
+    fontSize: '0.85rem',
     color: 'var(--accent-success)',
     cursor: 'pointer',
-    padding: '0.2rem 0.4rem',
+    padding: '0.15rem 0.35rem',
     borderRadius: 'var(--radius-sm)',
     backgroundColor: 'var(--bg-primary)',
+    minWidth: '40px',
+    textAlign: 'center',
+  },
+  clearanceDisplay: {
+    fontWeight: '800',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    padding: '0.15rem 0.35rem',
+    borderRadius: 'var(--radius-sm)',
+    backgroundColor: 'var(--bg-primary)',
+    minWidth: '40px',
+    textAlign: 'center',
+  },
+  editInputsGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+  },
+  editField: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.15rem',
+  },
+  miniLabel: {
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase',
+  },
+  editInput: {
+    width: '56px',
+    padding: '0.25rem 0.35rem',
+    backgroundColor: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '0.85rem',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontWeight: '700',
+    outline: 'none',
   },
   saveBtn: {
-    padding: '0.25rem 0.5rem',
+    padding: '0.35rem 0.55rem',
     backgroundColor: 'var(--accent-success)',
     color: '#ffffff',
     borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-end',
+    marginBottom: '2px',
   },
   actionIconBtn: {
     padding: '0.35rem',

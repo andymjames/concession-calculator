@@ -4,14 +4,16 @@ import ItemGrid from './components/ItemGrid';
 import CartView from './components/CartView';
 import SettingsModal from './components/SettingsModal';
 import HistoryDrawer from './components/HistoryDrawer';
+import CashModal from './components/CashModal';
 import { DEFAULT_ITEMS } from './data/defaultItems';
 import { calculateCartTotals, formatCurrency } from './utils/currency';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Banknote } from 'lucide-react';
 
 const MENU_STORAGE_KEY = 'concession_menu_items_v2';
 const MENU_HASH_KEY = 'concession_menu_default_hash_v2';
 const HISTORY_STORAGE_KEY = 'concession_order_history_v1';
 const OUTDOOR_MODE_KEY = 'concession_outdoor_mode';
+const CLEARANCE_MODE_KEY = 'concession_clearance_mode';
 
 const DEFAULT_ITEMS_HASH = JSON.stringify(DEFAULT_ITEMS);
 
@@ -28,7 +30,16 @@ export default function App() {
         return DEFAULT_ITEMS;
       }
 
-      return savedItems ? JSON.parse(savedItems) : DEFAULT_ITEMS;
+      if (savedItems) {
+        const parsed = JSON.parse(savedItems);
+        return parsed.map((item) => ({
+          ...item,
+          clearancePrice:
+            item.clearancePrice !== undefined ? item.clearancePrice : item.price,
+        }));
+      }
+
+      return DEFAULT_ITEMS;
     } catch {
       return DEFAULT_ITEMS;
     }
@@ -48,6 +59,15 @@ export default function App() {
     }
   });
 
+  // Clearance Mode
+  const [clearanceMode, setClearanceMode] = useState(() => {
+    try {
+      return localStorage.getItem(CLEARANCE_MODE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Completed Sales History
   const [history, setHistory] = useState(() => {
     try {
@@ -61,6 +81,7 @@ export default function App() {
   // Modal / Drawer visibility
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isCashModalOpen, setIsCashModalOpen] = useState(false);
 
   // Sync menu items to localStorage
   useEffect(() => {
@@ -94,20 +115,49 @@ export default function App() {
     }
   }, [outdoorMode]);
 
+  // Sync Clearance Mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLEARANCE_MODE_KEY, clearanceMode);
+    } catch (e) {
+      console.error('Failed to toggle clearance mode', e);
+    }
+  }, [clearanceMode]);
+
+  // Sync active cart item prices when clearance mode or menu items change
+  useEffect(() => {
+    setCart((prevCart) =>
+      prevCart.map((cartItem) => {
+        const menuItem = items.find((i) => i.id === cartItem.id);
+        if (!menuItem) return cartItem;
+        const activePrice =
+          clearanceMode && menuItem.clearancePrice !== undefined
+            ? menuItem.clearancePrice
+            : menuItem.price;
+        return { ...cartItem, price: activePrice };
+      }),
+    );
+  }, [clearanceMode, items]);
+
   /**
    * Cart Actions (Immutable state updates prevent StrictMode re-run double incrementing)
    */
   const handleAddToCart = (item) => {
+    const activePrice =
+      clearanceMode && item.clearancePrice !== undefined
+        ? item.clearancePrice
+        : item.price;
+
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex((i) => i.id === item.id);
       if (existingIndex > -1) {
         return prevCart.map((cartItem, idx) =>
           idx === existingIndex
-            ? { ...cartItem, quantity: cartItem.quantity + 1 }
-            : cartItem
+            ? { ...cartItem, price: activePrice, quantity: cartItem.quantity + 1 }
+            : cartItem,
         );
       }
-      return [...prevCart, { ...item, quantity: 1 }];
+      return [...prevCart, { ...item, price: activePrice, quantity: 1 }];
     });
   };
 
@@ -137,7 +187,7 @@ export default function App() {
   /**
    * Complete Sale Action: Logs transaction to history and resets cart/grid state
    */
-  const handleFinishSale = () => {
+  const handleFinishSale = (cashDetails = null) => {
     if (cart.length === 0) return;
 
     const newOrder = {
@@ -147,11 +197,18 @@ export default function App() {
       total: cartTotals.total,
       itemCount: cartTotals.totalItemCount,
       timestamp: new Date().toISOString(),
+      ...(cashDetails
+        ? {
+            tendered: cashDetails.tendered,
+            change: cashDetails.change,
+          }
+        : {}),
     };
 
     setHistory((prev) => [newOrder, ...prev]);
     setCart([]);
     setDiscountPercent(0);
+    setIsCashModalOpen(false);
   };
 
   // Menu Management
@@ -178,36 +235,61 @@ export default function App() {
         openHistory={() => setIsHistoryOpen(true)}
         openSettings={() => setIsSettingsOpen(true)}
         historyCount={history.length}
+        clearanceMode={clearanceMode}
       />
 
       <main className="main-content">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {/* Main Item Grid */}
-          <ItemGrid items={items} cart={cart} onAddToCart={handleAddToCart} />
+          <ItemGrid
+            items={items}
+            cart={cart}
+            onAddToCart={handleAddToCart}
+            clearanceMode={clearanceMode}
+          />
 
-          {/* Streamlined Checkout Total Card & Complete Sale Button */}
+          {/* Streamlined Checkout Total Card & Complete Sale Buttons */}
           <div style={styles.checkoutBox}>
-            <div style={styles.totalContainer}>
-              <span style={styles.totalLabel}>
-                TOTAL DUE {cartTotals.totalItemCount > 0 && `(${cartTotals.totalItemCount} items)`}
-              </span>
-              <div style={styles.totalAmount}>
-                {formatCurrency(cartTotals.total)}
+            <div style={styles.totalRow}>
+              <div style={styles.totalContainer}>
+                <span style={styles.totalLabel}>
+                  TOTAL DUE {cartTotals.totalItemCount > 0 && `(${cartTotals.totalItemCount} items)`}
+                </span>
+                <div style={styles.totalAmount}>
+                  {formatCurrency(cartTotals.total)}
+                </div>
               </div>
             </div>
 
-            <button
-              className="touch-btn"
-              style={{
-                ...styles.completeSaleBtn,
-                ...(cart.length === 0 ? styles.completeSaleBtnDisabled : {}),
-              }}
-              onClick={handleFinishSale}
-              disabled={cart.length === 0}
-            >
-              <CheckCircle2 size={22} />
-              <span>Complete Sale</span>
-            </button>
+            <div style={styles.checkoutBtnGroup}>
+              <button
+                className="touch-btn"
+                style={{
+                  ...styles.cashBtn,
+                  ...(cart.length === 0 ? styles.btnDisabled : {}),
+                }}
+                onClick={() => setIsCashModalOpen(true)}
+                disabled={cart.length === 0}
+                aria-label="Pay with cash and calculate change"
+              >
+                <Banknote size={20} />
+                <span>Cash</span>
+              </button>
+
+              <button
+                className="touch-btn"
+                style={{
+                  ...styles.completeSaleBtn,
+                  ...(cart.length === 0 ? styles.btnDisabled : {}),
+                }}
+                onClick={() => handleFinishSale()}
+                disabled={cart.length === 0}
+                aria-label="Complete sale for card or exact amount"
+              >
+                <CheckCircle2 size={20} />
+                <span>Complete Sale</span>
+              </button>
+            </div>
           </div>
 
           {/* Streamlined Itemized Order View */}
@@ -229,6 +311,8 @@ export default function App() {
         items={items}
         onUpdateItems={handleUpdateItems}
         onResetDefaultItems={handleResetDefaultItems}
+        clearanceMode={clearanceMode}
+        onToggleClearanceMode={() => setClearanceMode((prev) => !prev)}
       />
 
       <HistoryDrawer
@@ -237,6 +321,14 @@ export default function App() {
         history={history}
         onClearHistory={handleClearHistory}
       />
+
+      {/* Cash Payment & Change Calculator Modal */}
+      <CashModal
+        isOpen={isCashModalOpen}
+        total={cartTotals.total}
+        onClose={() => setIsCashModalOpen(false)}
+        onCompleteSale={(details) => handleFinishSale(details)}
+      />
     </div>
   );
 }
@@ -244,54 +336,77 @@ export default function App() {
 const styles = {
   checkoutBox: {
     display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '1rem',
+    flexDirection: 'column',
+    gap: '0.75rem',
     backgroundColor: 'var(--bg-secondary)',
     borderRadius: 'var(--radius-lg)',
-    padding: '0.85rem 1.25rem',
+    padding: '0.85rem 1.15rem',
     border: '2px solid var(--accent-primary)',
     boxShadow: 'var(--shadow-md)',
   },
+  totalRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   totalContainer: {
     display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   totalLabel: {
-    fontSize: '0.75rem',
+    fontSize: '0.8rem',
     fontWeight: '800',
     color: 'var(--text-secondary)',
     letterSpacing: '0.05em',
-    marginBottom: '0.15rem',
   },
   totalAmount: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: '2.25rem',
+    fontSize: '2.15rem',
     fontWeight: '800',
     color: '#ffffff',
     lineHeight: 1,
-    display: 'flex',
-    alignItems: 'center',
   },
-  completeSaleBtn: {
+  checkoutBtnGroup: {
+    display: 'flex',
+    gap: '0.65rem',
+    width: '100%',
+  },
+  cashBtn: {
+    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '0.5rem',
-    padding: '0.85rem 1.25rem',
+    gap: '0.45rem',
+    padding: '0.85rem 0.75rem',
+    backgroundColor: 'var(--accent-primary)',
+    color: '#ffffff',
+    borderRadius: 'var(--radius-md)',
+    fontSize: '1rem',
+    fontWeight: '800',
+    letterSpacing: '0.02em',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.35)',
+    whiteSpace: 'nowrap',
+  },
+  completeSaleBtn: {
+    flex: 1.4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.45rem',
+    padding: '0.85rem 0.75rem',
     backgroundColor: 'var(--accent-success)',
     color: '#ffffff',
     borderRadius: 'var(--radius-md)',
-    fontSize: '1.05rem',
+    fontSize: '1rem',
     fontWeight: '800',
     letterSpacing: '0.02em',
-    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
     whiteSpace: 'nowrap',
-    height: 'fit-content',
   },
-  completeSaleBtnDisabled: {
+  btnDisabled: {
     backgroundColor: 'var(--bg-card-hover)',
     color: 'var(--text-muted)',
     boxShadow: 'none',
