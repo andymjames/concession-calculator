@@ -98,18 +98,20 @@ export const DEFAULT_ITEMS = [
     emoji: '🍬',
     badgeColor: '#ec4899',
   },
- {
+  {
     id: 'item-16',
     name: 'Gummy Bears',
     price: 4,
+    clearancePrice: 4,
     category: 'Snacks',
     emoji: '🐻',
     badgeColor: '#ec4899',
   },
- {
+  {
     id: 'item-17',
     name: 'Krispie Treats',
     price: 1,
+    clearancePrice: 1,
     category: 'Snacks',
     emoji: '🟦',
     badgeColor: '#ec4899',
